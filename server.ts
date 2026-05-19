@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { generateYouTubeScript } from './src/services/ai.js';
 
 async function startServer() {
   const app = express();
@@ -11,25 +11,17 @@ async function startServer() {
 
   app.post('/api/generate', async (req, res) => {
     const { draft } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
     
-    if (!draft || !apiKey) {
-      return res.status(400).json({ error: 'Draft and API Key are required' });
+    if (!draft) {
+      return res.status(400).json({ error: 'Draft idea/topic is required.' });
     }
 
     try {
-      const genAI = new GoogleGenAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const prompt = `Write a YouTube script for: ${draft}. Return JSON with "paragraph" and "clips" array.`;
-      
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json' }
-      });
-      
-      res.json(JSON.parse(result.response.text()));
+      const data = await generateYouTubeScript(draft);
+      res.json(data);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      console.error('Express API Error:', err);
+      res.status(500).json({ error: err.message || 'Failed to generate script.' });
     }
   });
 

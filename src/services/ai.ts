@@ -6,12 +6,17 @@ export async function generateYouTubeScript(draft: string) {
     throw new Error('GEMINI_API_KEY is not set');
   }
 
-  const genAI = new GoogleGenAI({ apiKey }) as any;
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-1.5-flash',
-  });
+  try {
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
 
-  const prompt = `
+    const prompt = `
 You are an expert YouTube script writer. Write a catchy, highly engaging script based on the draft/topic below.
 The script should be between 1 and 3 minutes long (approx 150-450 words).
 
@@ -33,21 +38,24 @@ OUTPUT FORMAT (JSON ONLY):
     ...
   ]
 }
-  `.trim();
+    `.trim();
 
-  const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.7,
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.7,
+      }
+    });
+
+    if (!response.text) {
+      throw new Error('No response from AI model');
     }
-  });
-  const response = await result.response;
-  const text = response.text();
-  
-  if (!text) {
-    throw new Error('No response from AI model');
-  }
 
-  return JSON.parse(text);
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error('Gemini API Error:', error);
+    throw error;
+  }
 }

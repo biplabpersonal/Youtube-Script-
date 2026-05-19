@@ -22,7 +22,14 @@ async function startServer() {
         return res.status(500).json({ error: 'GEMINI_API_KEY environment variable is not set.' });
       }
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
 
       const prompt = `
 You are an expert YouTube script writer with years of experience. You are updated with all the latest trends and the script format for short-form content and know how to retain viewers for better engagement. The script should start with a catchy hook line and end with a call to action following the standard and latest scripting format.
@@ -47,7 +54,7 @@ Return ONLY a valid JSON object with the following structure (no markdown format
       `.trim();
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',

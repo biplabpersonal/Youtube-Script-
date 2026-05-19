@@ -29,9 +29,20 @@ export default function App() {
         body: JSON.stringify({ draft }),
       });
 
+      const contentType = res.headers.get('content-type');
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to generate script');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to generate script');
+        } else {
+          const errorText = await res.text();
+          console.error('Server returned non-JSON error:', errorText);
+          throw new Error(`Server error (${res.status}): The backend might not be set up correctly or crashed.`);
+        }
+      }
+
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned an unexpected format. Please make sure the backend is running.');
       }
 
       const data = await res.json();

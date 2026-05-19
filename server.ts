@@ -9,70 +9,27 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API Route for generating a script
   app.post('/api/generate', async (req, res) => {
+    const { draft } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!draft || !apiKey) {
+      return res.status(400).json({ error: 'Draft and API Key are required' });
+    }
+
     try {
-      const { draft } = req.body;
-      if (!draft) {
-        return res.status(400).json({ error: 'Draft idea/topic is required.' });
-      }
-
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ error: 'GEMINI_API_KEY environment variable is not set.' });
-      }
-
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
+      const genAI = new GoogleGenAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const prompt = `Write a YouTube script for: ${draft}. Return JSON with "paragraph" and "clips" array.`;
+      
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json' }
       });
-
-      const prompt = `
-You are an expert YouTube script writer with years of experience. You are updated with all the latest trends and the script format for short-form content and know how to retain viewers for better engagement. The script should start with a catchy hook line and end with a call to action following the standard and latest scripting format.
-
-TASK:
-Write a youtube script based on the following draft/topic. The script length should be more than 1 minute and under 3 minutes (about 150 to 450 words roughly). 
-IMPORTANT STYLE: Use all very simple words, things humans normally use in speaking. Want scripts in more simple words written - most commonly used words use only. The hook should be catchy but simple. Revise it to be as conversational and simple as possible.
-
-DRAFT/TOPIC:
-${draft}
-
-OUTPUT FORMAT:
-Return ONLY a valid JSON object with the following structure (no markdown formatting, no codeblocks):
-{
-  "paragraph": "The whole script in a single continuous paragraph. No line breaks.",
-  "clips": [
-    "clip 1 text (about 8 seconds of speaking, roughly 15-25 words)",
-    "clip 2 text (about 8 seconds of speaking, roughly 15-25 words)",
-    ...
-  ]
-}
-      `.trim();
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.7,
-        }
-      });
-
-      const responseText = response.text;
-      if (!responseText) {
-          throw new Error('Empty response from model');
-      }
-
-      const data = JSON.parse(responseText);
-
-      res.json(data);
-    } catch (error) {
-      console.error('Error generating script:', error);
-      res.status(500).json({ error: 'Failed to generate script.' });
+      
+      res.json(JSON.parse(result.response.text()));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
